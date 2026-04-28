@@ -1,20 +1,31 @@
 pipeline {
     agent any
+
     environment {
-        DOCKER_REGISTRY = 'ghcr.io/karthikpranavsivaraj'
+        DOCKER_REGISTRY          = 'ghcr.io/karthikpranavsivaraj'
+        DOCKER_CREDENTIAL_ID     = 'docker-registry-creds'
+        KUBECONFIG_CREDENTIAL_ID = 'kubeconfig-creds'
     }
+
     stages {
+
+        // -------------------------
+        // Checkout
+        // -------------------------
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
+
+        // -------------------------
+        // Node Pipeline
+        // -------------------------
         stage('Node Pipeline') {
             agent {
                 docker {
                     image 'node:20-alpine'
                     args '-u 0:0 -v /var/run/docker.sock:/var/run/docker.sock'
-                    reuseNode true
                 }
             }
             stages {
@@ -35,12 +46,15 @@ pipeline {
                 }
             }
         }
+
+        // -------------------------
+        // Build & Push Docker
+        // -------------------------
         stage('Build & Push Docker Images') {
             agent {
                 docker {
                     image 'docker:latest'
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
-                    reuseNode true
                 }
             }
             steps {
@@ -54,37 +68,42 @@ pipeline {
                         "ceo-api",
                         "api-gateway"
                     ]
-                    docker.withRegistry("https://ghcr.io", 'docker-registry-creds') {
-                        services.each { svc ->
-                            echo "Building ${svc}"
-                            def img = docker.build(
-                                "${env.DOCKER_REGISTRY}/${svc}:latest",
-                                "-f services/${svc}/Dockerfile services/${svc}"
+
+                    docker.withRegistry("https://${DOCKER_REGISTRY}", DOCKER_CREDENTIAL_ID) {
+                        services.each { service ->
+                            echo "Building ${service}"
+
+                            def image = docker.build(
+                                "${DOCKER_REGISTRY}/${service}:latest",
+                                "--build-arg SERVICE_NAME=${service} ."
                             )
-                            img.push('latest')
+
+                            image.push('latest')
                         }
                     }
                 }
             }
         }
+
+        // -------------------------
+        // Deploy to Kubernetes
+        // -------------------------
         stage('Deploy to Kubernetes') {
             steps {
-                script {
-                    withCredentials([file(credentialsId: 'kubeconfig-creds', variable: 'KUBECONFIG_FILE')]) {
-                        sh """
-                            export KUBECONFIG=\$KUBECONFIG_FILE
-                            kubectl apply -f infrastructure/k8s/base-config.yaml
-                            kubectl apply -f infrastructure/k8s/identity-service.yaml
-                            kubectl apply -f infrastructure/k8s/business-services.yaml
-                            kubectl apply -f infrastructure/k8s/event-services.yaml
-                            kubectl apply -f infrastructure/k8s/ingress-services.yaml
-                            kubectl rollout restart deployment -n institutional-platform
-                        """
-                    }
+                withKubeConfig([credentialsId: KUBECONFIG_CREDENTIAL_ID]) {
+
+                    sh "kubectl apply -f infrastructure/k8s/base-config.yaml"
+                    sh "kubectl apply -f infrastructure/k8s/identity-service.yaml"
+                    sh "kubectl apply -f infrastructure/k8s/business-services.yaml"
+                    sh "kubectl apply -f infrastructure/k8s/event-services.yaml"
+                    sh "kubectl apply -f infrastructure/k8s/ingress-services.yaml"
+
+                    sh "kubectl rollout restart deployment -n institutional-platform"
                 }
             }
         }
     }
+
     post {
         always {
             cleanWs()
