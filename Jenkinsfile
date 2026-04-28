@@ -4,17 +4,11 @@ pipeline {
         DOCKER_REGISTRY = 'ghcr.io/karthikpranavsivaraj'
     }
     stages {
-        // -------------------------
-        // Checkout
-        // -------------------------
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
-        // -------------------------
-        // Node Pipeline
-        // -------------------------
         stage('Node Pipeline') {
             agent {
                 docker {
@@ -41,9 +35,6 @@ pipeline {
                 }
             }
         }
-        // -------------------------
-        // Build & Push Docker Images
-        // -------------------------
         stage('Build & Push Docker Images') {
             agent {
                 docker {
@@ -64,21 +55,18 @@ pipeline {
                         "api-gateway"
                     ]
                     docker.withRegistry("https://ghcr.io", 'docker-registry-creds') {
-                        services.each { service ->
-                            echo "Building ${service}"
-                            def image = docker.build(
-                                "${env.DOCKER_REGISTRY}/${service}:latest",
-                                "-f services/${service}/Dockerfile services/${service}"
+                        services.each { svc ->
+                            echo "Building ${svc}"
+                            def img = docker.build(
+                                "${env.DOCKER_REGISTRY}/${svc}:latest",
+                                "-f services/${svc}/Dockerfile services/${svc}"
                             )
-                            image.push('latest')
+                            img.push('latest')
                         }
                     }
                 }
             }
         }
-        // -------------------------
-        // Deploy to Kubernetes
-        // -------------------------
         stage('Deploy to Kubernetes') {
             steps {
                 script {
