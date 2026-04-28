@@ -1,8 +1,8 @@
 pipeline {
-    agent any                                 // Master runs checkout & post‑actions
+    agent any                                 // Master runs checkout & postactions
     environment {
-        // 👉 Replace these placeholders with the actual values you have in Jenkins
-        DOCKER_REGISTRY          = 'ghcr.io/karthikpranavsivaraj'   // e.g. ghcr.io/your‑user
+        //  Replace these placeholders with the actual values you have in Jenkins
+        DOCKER_REGISTRY          = 'ghcr.io/karthikpranavsivaraj'   // e.g. ghcr.io/youruser
         DOCKER_CREDENTIAL_ID     = 'docker-registry-creds'               // Jenkins cred ID for Docker login
         KUBECONFIG_CREDENTIAL_ID = 'kubeconfig-creds'                    // Jenkins cred ID for kubeconfig
     }
@@ -10,7 +10,7 @@ pipeline {
     stages {
 
         // -------------------------------------------------
-        // 1️⃣ Checkout
+        // 1 Checkout
         // -------------------------------------------------
         stage('Checkout') {
             steps {
@@ -19,7 +19,7 @@ pipeline {
         }
 
         // -------------------------------------------------
-        // 2️⃣-4️⃣ Node.js Pipeline (Install, Lint, Test)
+        // 2-4 Node.js Pipeline (Install, Lint, Test)
         // -------------------------------------------------
         stage('Node.js Pipeline') {
             agent {
@@ -49,7 +49,7 @@ pipeline {
         }
 
         // -------------------------------------------------
-        // 5️⃣ Build & Push Docker Images (Docker client container)
+        // 5 Build & Push Docker Images (Docker client container)
         // -------------------------------------------------
         stage('Build & Push Docker Images') {
             agent {
@@ -60,7 +60,7 @@ pipeline {
             }
             steps {
                 script {
-                    // List every micro‑service that has its own Dockerfile at the repo root
+                    // List every microservice that has its own Dockerfile at the repo root
                     def services = [
                         "identity-service",
                         "student-service",
@@ -71,7 +71,7 @@ pipeline {
                         "api-gateway"
                     ]
 
-                    // Use Jenkins‑provided Docker registries helper
+                    // Use Jenkinsprovided Docker registries helper
                     docker.withRegistry("https://${DOCKER_REGISTRY}", DOCKER_CREDENTIAL_ID) {
                         services.each { service ->
                             echo "Building and pushing ${service}..."
@@ -90,7 +90,7 @@ pipeline {
         }
 
         // -------------------------------------------------
-        // 6️⃣ Deploy to Kubernetes
+        // 6 Deploy to Kubernetes
         // -------------------------------------------------
         stage('Deploy to Kubernetes') {
             steps {
@@ -104,7 +104,7 @@ pipeline {
                     sh "kubectl apply -f infrastructure/k8s/event-services.yaml"
                     sh "kubectl apply -f infrastructure/k8s/ingress-services.yaml"
 
-                    // Rolling restart forces pods to pull the newly‑pushed images
+                    // Rolling restart forces pods to pull the newly-pushed images
                     sh "kubectl rollout restart deployment -n institutional-platform"
                 }
             }
@@ -112,7 +112,7 @@ pipeline {
     }
 
     // -------------------------------------------------
-    // 7️⃣ Post actions (cleanup & notifications)
+    // 7 Post actions (cleanup & notifications)
     // -------------------------------------------------
     post {
         always {
@@ -120,10 +120,11 @@ pipeline {
             cleanWs()
         }
         success {
-            echo "✅ Deployment successful! 🎉"
+            echo "[SUCCESS] Deployment successful!"
         }
         failure {
-            echo "❌ Deployment failed – check the console output above."
+            echo "[FAILURE] Deployment failed - check the console output above."
         }
     }
 }
+
