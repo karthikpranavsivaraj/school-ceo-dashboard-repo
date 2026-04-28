@@ -1,14 +1,11 @@
 pipeline {
     agent any
-
     environment {
         DOCKER_REGISTRY          = 'ghcr.io/karthikpranavsivaraj'
         DOCKER_CREDENTIAL_ID     = 'docker-registry-creds'
         KUBECONFIG_CREDENTIAL_ID = 'kubeconfig-creds'
     }
-
     stages {
-
         // -------------------------
         // Checkout
         // -------------------------
@@ -17,7 +14,6 @@ pipeline {
                 checkout scm
             }
         }
-
         // -------------------------
         // Node Pipeline
         // -------------------------
@@ -46,7 +42,6 @@ pipeline {
                 }
             }
         }
-
         // -------------------------
         // Build & Push Docker
         // -------------------------
@@ -68,42 +63,35 @@ pipeline {
                         "ceo-api",
                         "api-gateway"
                     ]
-
-                    docker.withRegistry("https://${DOCKER_REGISTRY}", DOCKER_CREDENTIAL_ID) {
+                    docker.withRegistry("https://${env.DOCKER_REGISTRY}", 'docker-registry-creds') {
                         services.each { service ->
                             echo "Building ${service}"
-
                             def image = docker.build(
-                                "${DOCKER_REGISTRY}/${service}:latest",
+                                "${env.DOCKER_REGISTRY}/${service}:latest",
                                 "--build-arg SERVICE_NAME=${service} ."
                             )
-
                             image.push('latest')
                         }
                     }
                 }
             }
         }
-
         // -------------------------
         // Deploy to Kubernetes
         // -------------------------
         stage('Deploy to Kubernetes') {
             steps {
-                withKubeConfig([credentialsId: KUBECONFIG_CREDENTIAL_ID]) {
-
+                withKubeConfig([credentialsId: 'kubeconfig-creds']) {
                     sh "kubectl apply -f infrastructure/k8s/base-config.yaml"
                     sh "kubectl apply -f infrastructure/k8s/identity-service.yaml"
                     sh "kubectl apply -f infrastructure/k8s/business-services.yaml"
                     sh "kubectl apply -f infrastructure/k8s/event-services.yaml"
                     sh "kubectl apply -f infrastructure/k8s/ingress-services.yaml"
-
                     sh "kubectl rollout restart deployment -n institutional-platform"
                 }
             }
         }
     }
-
     post {
         always {
             cleanWs()
