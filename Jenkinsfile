@@ -1,9 +1,7 @@
 pipeline {
     agent any
     environment {
-        DOCKER_REGISTRY          = 'ghcr.io/karthikpranavsivaraj'
-        DOCKER_CREDENTIAL_ID     = 'docker-registry-creds'
-        KUBECONFIG_CREDENTIAL_ID = 'kubeconfig-creds'
+        DOCKER_REGISTRY = 'ghcr.io/karthikpranavsivaraj'
     }
     stages {
         // -------------------------
@@ -22,6 +20,7 @@ pipeline {
                 docker {
                     image 'node:20-alpine'
                     args '-u 0:0 -v /var/run/docker.sock:/var/run/docker.sock'
+                    reuseNode true
                 }
             }
             stages {
@@ -43,13 +42,14 @@ pipeline {
             }
         }
         // -------------------------
-        // Build & Push Docker
+        // Build & Push Docker Images
         // -------------------------
         stage('Build & Push Docker Images') {
             agent {
                 docker {
                     image 'docker:latest'
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
+                    reuseNode true
                 }
             }
             steps {
@@ -63,12 +63,12 @@ pipeline {
                         "ceo-api",
                         "api-gateway"
                     ]
-                    docker.withRegistry("https://${env.DOCKER_REGISTRY}", 'docker-registry-creds') {
+                    docker.withRegistry("https://ghcr.io", 'docker-registry-creds') {
                         services.each { service ->
                             echo "Building ${service}"
                             def image = docker.build(
                                 "${env.DOCKER_REGISTRY}/${service}:latest",
-                                "--build-arg SERVICE_NAME=${service} ."
+                                "-f services/${service}/Dockerfile services/${service}"
                             )
                             image.push('latest')
                         }
@@ -81,13 +81,18 @@ pipeline {
         // -------------------------
         stage('Deploy to Kubernetes') {
             steps {
-                withKubeConfig([credentialsId: 'kubeconfig-creds']) {
-                    sh "kubectl apply -f infrastructure/k8s/base-config.yaml"
-                    sh "kubectl apply -f infrastructure/k8s/identity-service.yaml"
-                    sh "kubectl apply -f infrastructure/k8s/business-services.yaml"
-                    sh "kubectl apply -f infrastructure/k8s/event-services.yaml"
-                    sh "kubectl apply -f infrastructure/k8s/ingress-services.yaml"
-                    sh "kubectl rollout restart deployment -n institutional-platform"
+                script {
+                    withCredentials([file(credentialsId: 'kubeconfig-creds', variable: 'KUBECONFIG_FILE')]) {
+                        sh """
+                            export KUBECONFIG=\$KUBECONFIG_FILE
+                            kubectl apply -f infrastructure/k8s/base-config.yaml
+                            kubectl apply -f infrastructure/k8s/identity-service.yaml
+                            kubectl apply -f infrastructure/k8s/business-services.yaml
+                            kubectl apply -f infrastructure/k8s/event-services.yaml
+                            kubectl apply -f infrastructure/k8s/ingress-services.yaml
+                            kubectl rollout restart deployment -n institutional-platform
+                        """
+                    }
                 }
             }
         }
