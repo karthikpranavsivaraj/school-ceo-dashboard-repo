@@ -1,27 +1,27 @@
 pipeline {
-    agent any                                 // Master runs checkout & postactions
+    agent any
+
     environment {
-        //  Replace these placeholders with the actual values you have in Jenkins
-        DOCKER_REGISTRY          = 'ghcr.io/karthikpranavsivaraj'   // e.g. ghcr.io/youruser
-        DOCKER_CREDENTIAL_ID     = 'docker-registry-creds'               // Jenkins cred ID for Docker login
-        KUBECONFIG_CREDENTIAL_ID = 'kubeconfig-creds'                    // Jenkins cred ID for kubeconfig
+        DOCKER_REGISTRY          = 'ghcr.io/karthikpranavsivaraj'
+        DOCKER_CREDENTIAL_ID     = 'docker-registry-creds'
+        KUBECONFIG_CREDENTIAL_ID = 'kubeconfig-creds'
     }
 
     stages {
 
-        // -------------------------------------------------
-        // 1 Checkout
-        // -------------------------------------------------
+        // -------------------------
+        // Checkout
+        // -------------------------
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        // -------------------------------------------------
-        // 2-4 Node.js Pipeline (Install, Lint, Test)
-        // -------------------------------------------------
-        stage('Node.js Pipeline') {
+        // -------------------------
+        // Node Pipeline
+        // -------------------------
+        stage('Node Pipeline') {
             agent {
                 docker {
                     image 'node:20-alpine'
@@ -29,38 +29,36 @@ pipeline {
                 }
             }
             stages {
-                stage('Install Dependencies') {
+                stage('Install') {
                     steps {
                         sh 'npm ci'
                     }
                 }
-                stage('Lint & Type Check') {
+                stage('Build') {
                     steps {
-                        sh 'npm run lint || true' // Using || true to avoid failing if lint is not setup
                         sh 'npm run build'
                     }
                 }
                 stage('Test') {
                     steps {
-                        sh 'npm test || true' // Using || true to avoid failing if tests are not setup
+                        sh 'npm test || true'
                     }
                 }
             }
         }
 
-        // -------------------------------------------------
-        // 5 Build & Push Docker Images (Docker client container)
-        // -------------------------------------------------
+        // -------------------------
+        // Build & Push Docker
+        // -------------------------
         stage('Build & Push Docker Images') {
             agent {
                 docker {
-                    image 'docker:latest'                 // Docker client only
-                    args '-v /var/run/docker.sock:/var/run/docker.sock' // gives container access to host daemon
+                    image 'docker:latest'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
                 }
             }
             steps {
                 script {
-                    // List every microservice that has its own Dockerfile at the repo root
                     def services = [
                         "identity-service",
                         "student-service",
@@ -71,17 +69,15 @@ pipeline {
                         "api-gateway"
                     ]
 
-                    // Use Jenkinsprovided Docker registries helper
                     docker.withRegistry("https://${DOCKER_REGISTRY}", DOCKER_CREDENTIAL_ID) {
                         services.each { service ->
-                            echo "Building and pushing ${service}..."
-                            // Build passes the SERVICE_NAME arg so the Dockerfile can copy the correct code
+                            echo "Building ${service}"
+
                             def image = docker.build(
-                                "${DOCKER_REGISTRY}/${service}:${env.BUILD_NUMBER}",
+                                "${DOCKER_REGISTRY}/${service}:latest",
                                 "--build-arg SERVICE_NAME=${service} ."
                             )
-                            // Push both the specific build number and a 'latest' tag
-                            image.push()
+
                             image.push('latest')
                         }
                     }
@@ -89,14 +85,12 @@ pipeline {
             }
         }
 
-        // -------------------------------------------------
-        // 6 Deploy to Kubernetes
-        // -------------------------------------------------
+        // -------------------------
+        // Deploy to Kubernetes
+        // -------------------------
         stage('Deploy to Kubernetes') {
             steps {
-                // The withKubeConfig step injects the kubeconfig from Jenkins credentials
                 withKubeConfig([credentialsId: KUBECONFIG_CREDENTIAL_ID]) {
-                    echo "Deploying to namespace: institutional-platform"
 
                     sh "kubectl apply -f infrastructure/k8s/base-config.yaml"
                     sh "kubectl apply -f infrastructure/k8s/identity-service.yaml"
@@ -104,27 +98,21 @@ pipeline {
                     sh "kubectl apply -f infrastructure/k8s/event-services.yaml"
                     sh "kubectl apply -f infrastructure/k8s/ingress-services.yaml"
 
-                    // Rolling restart forces pods to pull the newly-pushed images
                     sh "kubectl rollout restart deployment -n institutional-platform"
                 }
             }
         }
     }
 
-    // -------------------------------------------------
-    // 7 Post actions (cleanup & notifications)
-    // -------------------------------------------------
     post {
         always {
-            // Guarantees the workspace is cleaned so the next build starts fresh
             cleanWs()
         }
         success {
-            echo "[SUCCESS] Deployment successful!"
+            echo "Deployment successful"
         }
         failure {
-            echo "[FAILURE] Deployment failed - check the console output above."
+            echo "Deployment failed - check logs"
         }
     }
 }
-
