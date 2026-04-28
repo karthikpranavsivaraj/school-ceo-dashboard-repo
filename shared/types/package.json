@@ -1,0 +1,16 @@
+{
+  "name": "@shared/types",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@shared/utils": "^1.0.0",
+    "prom-client": "^15.1.3"
+  }
+}

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: institutional-platform
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-config
+  namespace: institutional-platform
+data:
+  IDENTITY_SERVICE_URL: "http://identity-service:3001"
+  STUDENT_SERVICE_URL: "http://student-service:3002"
+  TEACHER_SERVICE_URL: "http://teacher-service:3003"
+  ANALYTICS_SERVICE_URL: "http://analytics-service:3004"
+  WEBHOOK_SERVICE_URL: "http://webhook-service:3005"
+  CEO_API_URL: "http://ceo-api:3006"

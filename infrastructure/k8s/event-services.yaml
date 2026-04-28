@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-service
+  namespace: institutional-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webhook-service
+  template:
+    metadata:
+      labels:
+        app: webhook-service
+    spec:
+      containers:
+      - name: webhook-service
+        image: webhook-service:latest
+        ports:
+        - containerPort: 3005
+        env:
+        - name: PORT
+          value: "3005"
+        - name: ANALYTICS_SERVICE_URL
+          value: "http://analytics-service:3004/events"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook-service
+  namespace: institutional-platform
+spec:
+  selector:
+    app: webhook-service
+  ports:
+    - protocol: TCP
+      port: 3005
+      targetPort: 3005
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: institutional-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+      - name: analytics-service
+        image: analytics-service:latest
+        ports:
+        - containerPort: 3004
+        env:
+        - name: PORT
+          value: "3004"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: institutional-platform
+spec:
+  selector:
+    app: analytics-service
+  ports:
+    - protocol: TCP
+      port: 3004
+      targetPort: 3004

@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  identity-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: identity-service
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - JWT_SECRET=super-secret-key
+    networks:
+      - school-network
+
+  student-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: student-service
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+    networks:
+      - school-network
+
+  teacher-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: teacher-service
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+      - STUDENT_SERVICE_URL=http://student-service:3002
+      - WEBHOOK_SERVICE_URL=http://webhook-service:3005
+    networks:
+      - school-network
+
+  webhook-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: webhook-service
+    ports:
+      - "3005:3005"
+    environment:
+      - PORT=3005
+      - ANALYTICS_SERVICE_URL=http://analytics-service:3004/events
+    networks:
+      - school-network
+
+  analytics-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: analytics-service
+    ports:
+      - "3004:3004"
+    environment:
+      - PORT=3004
+    networks:
+      - school-network
+
+  ceo-api:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: ceo-api
+    ports:
+      - "3006:3006"
+    environment:
+      - PORT=3006
+      - ANALYTICS_SERVICE_URL=http://analytics-service:3004
+      - STUDENT_SERVICE_URL=http://student-service:3002
+    networks:
+      - school-network
+
+  api-gateway:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - IDENTITY_SERVICE_URL=http://identity-service:3001
+      - STUDENT_SERVICE_URL=http://student-service:3002
+      - TEACHER_SERVICE_URL=http://teacher-service:3003
+      - CEO_API_URL=http://ceo-api:3006
+      - JWT_SECRET=super-secret-key
+    networks:
+      - school-network
+    depends_on:
+      - identity-service
+      - student-service
+      - teacher-service
+      - ceo-api
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./infrastructure/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - school-network
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - school-network
+    depends_on:
+      - prometheus
+
+networks:
+  school-network:
+    driver: bridge
