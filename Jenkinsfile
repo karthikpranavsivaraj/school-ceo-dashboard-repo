@@ -3,8 +3,8 @@ pipeline {
     environment {
         // 👉 Replace these placeholders with the actual values you have in Jenkins
         DOCKER_REGISTRY          = 'ghcr.io/karthikpranavsivaraj'   // e.g. ghcr.io/your‑user
-        DOCKER_CREDENTIAL_ID     = 'docker‑registry‑creds'               // Jenkins cred ID for Docker login
-        KUBECONFIG_CREDENTIAL_ID = 'kubeconfig‑creds'                    // Jenkins cred ID for kubeconfig
+        DOCKER_CREDENTIAL_ID     = 'docker-registry-creds'               // Jenkins cred ID for Docker login
+        KUBECONFIG_CREDENTIAL_ID = 'kubeconfig-creds'                    // Jenkins cred ID for kubeconfig
     }
 
     stages {
