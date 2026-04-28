@@ -83,7 +83,7 @@ pipeline {
                         services.each { service ->
                             echo "Building and pushing ${service}..."
                             // Build passes the SERVICE_NAME arg so the Dockerfile can copy the correct code
-                            def image = docke3r.build(
+                            def image = docker.build(
                                 "${DOCKER_REGISTRY}/${service}:${env.BUILD_NUMBER}",
                                 "--build-arg SERVICE_NAME=${service} ."
                             )
